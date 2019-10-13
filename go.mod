@@ -1,3 +1,3 @@
-module github.com/thatgitsam/go-nuget
+module github.com/soloworks/go-nuget
 
 go 1.13
