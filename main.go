@@ -1,11 +1,16 @@
 package main
 
 import (
+	"archive/zip"
+	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/user"
+	"path/filepath"
+	"strings"
 	"time"
 
 	nuspec "github.com/soloworks/go-nuspec"
@@ -14,7 +19,8 @@ import (
 
 func checkError(e error) {
 	if e != nil {
-		panic(e)
+		println(e.Error())
+		os.Exit(1)
 	}
 }
 func main() {
@@ -33,27 +39,31 @@ func main() {
 	// Subcommands
 	app.Commands = []cli.Command{
 		{
-			Name:    "pack",
-			Aliases: []string{"a"},
-			Usage:   "generate .nupkg file from .nuspec",
-			Action: func(c *cli.Context) error {
-				fmt.Println("added task: ", c.Args().First())
-				return nil
+			Name:  "pack",
+			Usage: "Creates a NuGet package based on the specified nuspec file.",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "BasePath",
+					Usage: "Sets the base path of the files defined in the .nuspec file.",
+				},
+				cli.StringFlag{
+					Name:  "OutputDirectory",
+					Usage: "Specifies the folder in which the created package is stored. If no folder is specified, the current folder is used.",
+				},
 			},
+			Action: packNuspec,
 		},
 		{
-			Name:    "push",
-			Aliases: []string{"c"},
-			Usage:   "upload a .nupkg file to a nuget server",
+			Name:  "push",
+			Usage: "Pushes a package to the server and publishes it.",
 			Action: func(c *cli.Context) error {
 				fmt.Println("completed task: ", c.Args().First())
 				return nil
 			},
 		},
 		{
-			Name:    "spec",
-			Aliases: []string{"c"},
-			Usage:   "Generates a nuspec for a new package.",
+			Name:  "spec",
+			Usage: "Generates a nuspec for a new package.",
 			Flags: []cli.Flag{
 				cli.BoolFlag{
 					Name:  "Force",
@@ -100,21 +110,111 @@ func sampleNuspec(c *cli.Context) error {
 		n.Meta.ID = c.Args().First()
 	}
 
-	// Output it to the disk
+	// Set filename string
 	fn := n.Meta.ID + ".nuspec"
 
+	// Check if file exists and -Force isn't active
 	if _, err := os.Stat(fn); !os.IsNotExist(err) {
 		if !c.Bool("Force") {
-			println("'" + fn + "' already exists, use -Force to overwrite it.")
-			os.Exit(1)
+			return errors.New("'" + fn + "' already exists, use -Force to overwrite it.")
 		}
 	}
 
+	// Convert to []byte
 	b, err := n.ToBytes()
 	checkError(err)
+
+	// Writ to filesystem
 	err = ioutil.WriteFile(fn, b, 0644)
 	checkError(err)
+
 	// Echo out message
 	fmt.Println("Created: '" + fn + "' successfully.")
+	return nil
+}
+
+// Package up a NuSpec file
+func packNuspec(c *cli.Context) error {
+
+	filename := c.Args().First()
+
+	// Check .nuspec file has been supplied
+	if filename == "" {
+		return errors.New("Error NU5002: Please specify a nuspec file to use")
+	}
+	// Log out
+	fmt.Println("Attempting to build package from '" + filename + "'.")
+	// Read in the nuspec file
+	n, err := nuspec.FromFile(filename)
+	checkError(err)
+
+	// Set BasePath based on file provided
+	basePath := filepath.Dir(filename)
+
+	// Override basePath if option is set
+	if bp := c.String("BasePath"); bp != "" {
+		basePath = bp
+	}
+
+	// Set OutputDirectory based on file provided
+	outputPath := ""
+
+	// Override OutputDirectory if option is set
+	if op := c.String("OutputDirectory"); op != "" {
+		outputPath = op
+	}
+
+	// Create a buffer to write our archive to.
+	buf := new(bytes.Buffer)
+
+	// Create a new zip archive.
+	w := zip.NewWriter(buf)
+	defer w.Close()
+
+	// Create the .nuspec file to the root of the zip
+	f, err := w.Create(filepath.Base(filename))
+	checkError(err)
+
+	// Export .nuspec as bytes
+	b, err := n.ToBytes()
+	checkError(err)
+
+	// Write .nuspec bytes to file
+	_, err = f.Write([]byte(b))
+	checkError(err)
+
+	// Walk the basePath and zip up all found files
+	err = filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() && filepath.Base(path) != filepath.Base(filename) {
+			x, err := os.Open(path)
+			checkError(err)
+			y, err := ioutil.ReadAll(x)
+			checkError(err)
+			z, err := w.Create(filepath.Clean(strings.Replace(path, basePath, ".", 1)))
+			checkError(err)
+			z.Write(y)
+			checkError(err)
+		}
+		return nil
+	})
+
+	// Close the zipwriter
+	w.Close()
+
+	// Ensure directory is present
+	if outputPath != "" {
+		os.MkdirAll(outputPath, os.ModePerm)
+	}
+	// Create new file on disk
+	outputFile := n.Meta.ID + "." + n.Meta.Version + ".zip"
+	outputFile = filepath.Join(outputPath, outputFile)
+	err = ioutil.WriteFile(outputFile, buf.Bytes(), os.ModePerm)
+	checkError(err)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	println("Successfully created package '" + outputFile + "'")
 	return nil
 }
