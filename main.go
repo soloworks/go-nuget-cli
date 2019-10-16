@@ -3,6 +3,7 @@ package main
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -23,6 +24,18 @@ func checkError(e error) {
 		os.Exit(1)
 	}
 }
+
+func archiveFile(filename string, w *zip.Writer, b []byte) {
+
+	// Create the .nuspec file to the root of the zip
+	f, err := w.Create(filepath.Base(filename))
+	checkError(err)
+
+	// Write .nuspec bytes to file
+	_, err = f.Write([]byte(b))
+	checkError(err)
+}
+
 func main() {
 	app := cli.NewApp()
 	app.Name = "go-nuget"
@@ -133,6 +146,68 @@ func sampleNuspec(c *cli.Context) error {
 	return nil
 }
 
+// ContentTypeEntry is used by the ContentTypes struct
+type ContentTypeEntry struct {
+	Extension   string `xml:"Extension,attr"`
+	ContentType string `xml:"ContentType,attr"`
+}
+
+// ContentTypes is represents a [Content_Types].xml file from a .nupkg file
+type ContentTypes struct {
+	XMLName xml.Name           `xml:"Types"`
+	Xmlns   string             `xml:"xmlns,attr"`
+	Entry   []ContentTypeEntry `xml:"Default"`
+}
+
+// NewContentTypes is a constructor for the ContentTypes struct
+func NewContentTypes() *ContentTypes {
+	ct := &ContentTypes{}
+	ct.Xmlns = "http://schemas.openxmlformats.org/package/2006/content-types"
+	return ct
+}
+
+// Add pushes a new extension into a ContentType struct
+func (ct *ContentTypes) Add(ext string) {
+	// Create a new entry
+	cte := &ContentTypeEntry{Extension: ext}
+	// If it already exists we can exit
+	for _, e := range ct.Entry {
+		if e.Extension == cte.Extension {
+			return
+		}
+	}
+	// Set the content type
+	switch cte.Extension {
+	case "rels":
+		cte.ContentType = "application/vnd.openxmlformats-package.relationships+xml"
+	case "psmdcp":
+		cte.ContentType = "application/vnd.openxmlformats-package.core-properties+xml"
+	default:
+		cte.ContentType = "application/octet"
+	}
+}
+
+// ToBytes produces the nuspec in XML format
+func (ct *ContentTypes) ToBytes() ([]byte, error) {
+	var b bytes.Buffer
+	// Unmarshal into XML
+	output, err := xml.MarshalIndent(ct, "", "  ")
+	if err != nil {
+		return nil, err
+	}
+	// Self-Close any empty XML elements (to match original Nuget output)
+	// This assumes Indented Marshalling above, non Indented will break XML
+	for bytes.Contains(output, []byte(`></`)) {
+		i := bytes.Index(output, []byte(`></`))
+		j := bytes.Index(output[i+1:], []byte(`>`))
+		output = append(output[:i], append([]byte(` /`), output[i+j+1:]...)...)
+	}
+	// Write the XML Header
+	b.WriteString(xml.Header)
+	b.Write(output)
+	return b.Bytes(), nil
+}
+
 // Package up a NuSpec file
 func packNuspec(c *cli.Context) error {
 
@@ -167,21 +242,18 @@ func packNuspec(c *cli.Context) error {
 	// Create a buffer to write our archive to.
 	buf := new(bytes.Buffer)
 
-	// Create a new zip archive.
+	// Create a new zip archive
 	w := zip.NewWriter(buf)
 	defer w.Close()
 
-	// Create the .nuspec file to the root of the zip
-	f, err := w.Create(filepath.Base(filename))
-	checkError(err)
+	// Create a new Contenttypes Structure
+	ct := NewContentTypes()
 
 	// Export .nuspec as bytes
 	b, err := n.ToBytes()
 	checkError(err)
-
-	// Write .nuspec bytes to file
-	_, err = f.Write([]byte(b))
-	checkError(err)
+	archiveFile(filepath.Base(filename), w, b)
+	ct.Add(filepath.Ext(filename))
 
 	// Walk the basePath and zip up all found files
 	err = filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
@@ -190,13 +262,18 @@ func packNuspec(c *cli.Context) error {
 			checkError(err)
 			y, err := ioutil.ReadAll(x)
 			checkError(err)
-			z, err := w.Create(filepath.Clean(strings.Replace(path, basePath, ".", 1)))
-			checkError(err)
-			z.Write(y)
-			checkError(err)
+			archiveFile(filepath.Clean(strings.Replace(path, basePath, ".", 1)), w, y)
+
+			ct.Add(filepath.Ext(filename))
 		}
 		return nil
 	})
+
+	// Export .nuspec as bytes
+	b, err = ct.ToBytes()
+	checkError(err)
+	archiveFile(filepath.Base(filename), w, b)
+	ct.Add(filepath.Ext(filename))
 
 	// Close the zipwriter
 	w.Close()
