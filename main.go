@@ -28,7 +28,7 @@ func checkError(e error) {
 func archiveFile(filename string, w *zip.Writer, b []byte) {
 
 	// Create the .nuspec file to the root of the zip
-	f, err := w.Create(filepath.Base(filename))
+	f, err := w.Create(filename)
 	checkError(err)
 
 	// Write .nuspec bytes to file
@@ -154,9 +154,9 @@ type ContentTypeEntry struct {
 
 // ContentTypes is represents a [Content_Types].xml file from a .nupkg file
 type ContentTypes struct {
-	XMLName xml.Name           `xml:"Types"`
-	Xmlns   string             `xml:"xmlns,attr"`
-	Entry   []ContentTypeEntry `xml:"Default"`
+	XMLName xml.Name            `xml:"Types"`
+	Xmlns   string              `xml:"xmlns,attr"`
+	Entry   []*ContentTypeEntry `xml:"Default"`
 }
 
 // NewContentTypes is a constructor for the ContentTypes struct
@@ -168,6 +168,9 @@ func NewContentTypes() *ContentTypes {
 
 // Add pushes a new extension into a ContentType struct
 func (ct *ContentTypes) Add(ext string) {
+	if strings.HasPrefix(ext, ".") {
+		ext = strings.TrimLeft(ext, ".")
+	}
 	// Create a new entry
 	cte := &ContentTypeEntry{Extension: ext}
 	// If it already exists we can exit
@@ -185,6 +188,8 @@ func (ct *ContentTypes) Add(ext string) {
 	default:
 		cte.ContentType = "application/octet"
 	}
+	// Add it to the array
+	ct.Entry = append(ct.Entry, cte)
 }
 
 // ToBytes produces the nuspec in XML format
@@ -262,18 +267,19 @@ func packNuspec(c *cli.Context) error {
 			checkError(err)
 			y, err := ioutil.ReadAll(x)
 			checkError(err)
-			archiveFile(filepath.Clean(strings.Replace(path, basePath, ".", 1)), w, y)
+			p, err := filepath.Rel(basePath, path)
+			checkError(err)
+			archiveFile(p, w, y)
 
-			ct.Add(filepath.Ext(filename))
+			ct.Add(filepath.Ext(p))
 		}
 		return nil
 	})
 
-	// Export .nuspec as bytes
+	// Export [Content_Types].xml as bytes
 	b, err = ct.ToBytes()
 	checkError(err)
-	archiveFile(filepath.Base(filename), w, b)
-	ct.Add(filepath.Ext(filename))
+	archiveFile(`[Content_Types]xml`, w, b)
 
 	// Close the zipwriter
 	w.Close()
