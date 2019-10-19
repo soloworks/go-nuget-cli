@@ -36,6 +36,21 @@ nuget pack <nuspecPath | projectPath> [options] [-Properties ...]
 nuget push <packagePath> [options]
 ```
 
+#### Notes
+
+Packages are PUT using the mime type `multipart/form-data` with a randomly generated `boundary` parameter, eg
+
+```
+multipart/form-data; boundary="88742a6c-280a-43a2-ad06-1b27ebb33d6e"
+```
+
+The multipart headers used are:
+
+```
+Content-Type: application/octet-stream
+Content-Disposition: form-data; name=package; filename=package.nupkg; filename*=utf-8''package.nupkg
+```
+
 ## Resources
 
 - Microsoft nuget.exe CLI [[Here]](https://docs.microsoft.com/en-us/nuget/reference/nuget-exe-cli-reference)
