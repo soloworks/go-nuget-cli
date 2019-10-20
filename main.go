@@ -279,7 +279,7 @@ func packNuspec(c *cli.Context) error {
 	// Export [Content_Types].xml as bytes
 	b, err = ct.ToBytes()
 	checkError(err)
-	archiveFile(`[Content_Types]xml`, w, b)
+	archiveFile(`[Content_Types].xml`, w, b)
 
 	// Close the zipwriter
 	w.Close()
@@ -289,7 +289,7 @@ func packNuspec(c *cli.Context) error {
 		os.MkdirAll(outputPath, os.ModePerm)
 	}
 	// Create new file on disk
-	outputFile := n.Meta.ID + "." + n.Meta.Version + ".zip"
+	outputFile := n.Meta.ID + "." + n.Meta.Version + ".nupkg"
 	outputFile = filepath.Join(outputPath, outputFile)
 	err = ioutil.WriteFile(outputFile, buf.Bytes(), os.ModePerm)
 	checkError(err)
