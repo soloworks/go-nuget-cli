@@ -13,8 +13,10 @@ jobs:
         name: Checkout
         uses: actions/checkout@v1
       -
-        name: Set up Go
+        name: Set up Go 1.13
         uses: actions/setup-go@v1
+        with:
+          go-version: 1.13
 
       - name: Get dependencies
         run: |
