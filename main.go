@@ -20,7 +20,7 @@ import (
 )
 
 // Version Number -ldflags="-X 'main.Version=xX.Y.Z'"
-var Version string = "0.0.0-source"
+var version string = "0.0.0-source"
 
 const letterBytes = "abcdef0123456789"
 
