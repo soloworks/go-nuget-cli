@@ -4,8 +4,10 @@ A partial implementation of the Nuget CLI tool, written in Go, for use in automa
 
 Writen in Go to be platform agnostic, built against the go-nuget-server project.
 
+![Build Status](https://github.com/soloworks/go-nuget/workflows/Go/badge.svg)
 [![MIT license](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 [![LinkedIn](https://img.shields.io/badge/Contact-LinkedIn-blue)](https://www.linkedin.com/company/soloworkslondon/)
+
 
 
 ## Getting Started
