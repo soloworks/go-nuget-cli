@@ -1,6 +1,6 @@
 # go-nuget
 
-A partial implementation of the Nuget CLI tool, written in Go, for use in automated build processes and deployment of .nuspec &amp; .nupkg files.
+A basic implementation of the Nuget CLI tool, written in Go, for use in automated build processes and deployment of .nuspec &amp; .nupkg files.
 
 Writen in Go to be platform agnostic, built against the go-nuget-server project.
 
@@ -8,48 +8,38 @@ Writen in Go to be platform agnostic, built against the go-nuget-server project.
 [![MIT license](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0.en.html)
 [![LinkedIn](https://img.shields.io/badge/Contact-LinkedIn-blue)](https://www.linkedin.com/company/soloworkslondon/)
 
-## Getting Started
+## Getting Started - Source
 
 ```bash
 git clone github/soloworks/go-nuget
 
 go build -o nuget.exe
-```
-
-## Implementation (Working ToDo)
-
-### spec
-
-```cmd
-nuget spec [<packageID>] [options]
-```
-
-### pack [ToDo]
-
-```cmd
-nuget pack <nuspecPath | projectPath> [options] [-Properties ...]
-```
-
-### push [ToDo]
-
-```cmd
-nuget push <packagePath> [options]
-```
-
-#### Notes
-
-Packages are PUT using the mime type `multipart/form-data` with a randomly generated `boundary` parameter, eg
 
 ```
-multipart/form-data; boundary="88742a6c-280a-43a2-ad06-1b27ebb33d6e"
+
+## CLI
+
+### spec - Generates a .nuspec file
+
+```bash
+nuget spec <packageID>
 ```
 
-The multipart headers used are:
+### pack - Generates a .nupkg file
 
+```bash
+nuget pack nuspecPath
 ```
-Content-Type: application/octet-stream
-Content-Disposition: form-data; name=package; filename=package.nupkg; filename*=utf-8''package.nupkg
+
+### push - Pushes a package to a server
+
+```bash
+nuget push <packagePath> --Source http://<yourserver>/<packages-root>/ --ApiKey 123-456-789
 ```
+
+## Notes
+
+TBC
 
 ## Resources
 
