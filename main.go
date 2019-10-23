@@ -41,7 +41,7 @@ func checkError(e error) {
 
 func main() {
 	app := cli.NewApp()
-	app.Version = Version
+	app.Version = version
 	app.Name = "go-nuget"
 	app.Usage = "An open source nuget clone in Go"
 	app.Authors = []cli.Author{
