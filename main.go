@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	nuspec "github.com/soloworks/go-nuspec"
@@ -21,6 +22,7 @@ import (
 
 // Version Number -ldflags="-X 'main.Version=xX.Y.Z'"
 var version string = "0.0.0-source"
+var compiled string = "1262304000" // 01/01/2010 @ 12:00am
 
 const letterBytes = "abcdef0123456789"
 
@@ -41,7 +43,15 @@ func checkError(e error) {
 
 func main() {
 	app := cli.NewApp()
+	// Build Values - Version String
 	app.Version = version
+	// Build Values - Compiled Timestamp from Unix Time String
+	i, err := strconv.ParseInt(compiled, 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	app.Compiled = time.Unix(i, 0)
+
 	app.Name = "go-nuget"
 	app.Usage = "An open source nuget clone in Go"
 	app.Authors = []cli.Author{
@@ -97,7 +107,7 @@ func main() {
 		},
 	}
 
-	err := app.Run(os.Args)
+	err = app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)
 	}
