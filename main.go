@@ -3,16 +3,16 @@ package main
 import (
 	"archive/zip"
 	"bytes"
-	"encoding/xml"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"mime/multipart"
+	"net/http"
 	"os"
 	"os/user"
 	"path/filepath"
-	"strings"
 	"time"
 
 	nuspec "github.com/soloworks/go-nuspec"
@@ -34,17 +34,6 @@ func checkError(e error) {
 		println(e.Error())
 		os.Exit(1)
 	}
-}
-
-func archiveFile(filename string, w *zip.Writer, b []byte) {
-
-	// Create the .nuspec file to the root of the zip
-	f, err := w.Create(filename)
-	checkError(err)
-
-	// Write .nuspec bytes to file
-	_, err = f.Write([]byte(b))
-	checkError(err)
 }
 
 func main() {
@@ -75,15 +64,22 @@ func main() {
 					Usage: "Specifies the folder in which the created package is stored. If no folder is specified, the current folder is used.",
 				},
 			},
-			Action: packNuspec,
+			Action: packNupkg,
 		},
 		{
 			Name:  "push",
 			Usage: "Pushes a package to the server and publishes it.",
-			Action: func(c *cli.Context) error {
-				fmt.Println("completed task: ", c.Args().First())
-				return nil
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "ApiKey",
+					Usage: "The API key for the target repository.",
+				},
+				cli.StringFlag{
+					Name:  "Source",
+					Usage: "Specifies the server URL.",
+				},
 			},
+			Action: pushNupkg,
 		},
 		{
 			Name:  "spec",
@@ -157,75 +153,19 @@ func sampleNuspec(c *cli.Context) error {
 	return nil
 }
 
-// ContentTypeEntry is used by the ContentTypes struct
-type ContentTypeEntry struct {
-	Extension   string `xml:"Extension,attr"`
-	ContentType string `xml:"ContentType,attr"`
-}
+func archiveFile(filename string, w *zip.Writer, b []byte) {
 
-// ContentTypes is represents a [Content_Types].xml file from a .nupkg file
-type ContentTypes struct {
-	XMLName xml.Name            `xml:"Types"`
-	Xmlns   string              `xml:"xmlns,attr"`
-	Entry   []*ContentTypeEntry `xml:"Default"`
-}
+	// Create the .nuspec file to the root of the zip
+	f, err := w.Create(filename)
+	checkError(err)
 
-// NewContentTypes is a constructor for the ContentTypes struct
-func NewContentTypes() *ContentTypes {
-	ct := &ContentTypes{}
-	ct.Xmlns = "http://schemas.openxmlformats.org/package/2006/content-types"
-	return ct
-}
-
-// Add pushes a new extension into a ContentType struct
-func (ct *ContentTypes) Add(ext string) {
-	if strings.HasPrefix(ext, ".") {
-		ext = strings.TrimLeft(ext, ".")
-	}
-	// Create a new entry
-	cte := &ContentTypeEntry{Extension: ext}
-	// If it already exists we can exit
-	for _, e := range ct.Entry {
-		if e.Extension == cte.Extension {
-			return
-		}
-	}
-	// Set the content type
-	switch cte.Extension {
-	case "rels":
-		cte.ContentType = "application/vnd.openxmlformats-package.relationships+xml"
-	case "psmdcp":
-		cte.ContentType = "application/vnd.openxmlformats-package.core-properties+xml"
-	default:
-		cte.ContentType = "application/octet"
-	}
-	// Add it to the array
-	ct.Entry = append(ct.Entry, cte)
-}
-
-// ToBytes produces the nuspec in XML format
-func (ct *ContentTypes) ToBytes() ([]byte, error) {
-	var b bytes.Buffer
-	// Unmarshal into XML
-	output, err := xml.MarshalIndent(ct, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-	// Self-Close any empty XML elements (to match original Nuget output)
-	// This assumes Indented Marshalling above, non Indented will break XML
-	for bytes.Contains(output, []byte(`></`)) {
-		i := bytes.Index(output, []byte(`></`))
-		j := bytes.Index(output[i+1:], []byte(`>`))
-		output = append(output[:i], append([]byte(` /`), output[i+j+1:]...)...)
-	}
-	// Write the XML Header
-	b.WriteString(xml.Header)
-	b.Write(output)
-	return b.Bytes(), nil
+	// Write .nuspec bytes to file
+	_, err = f.Write([]byte(b))
+	checkError(err)
 }
 
 // Package up a NuSpec file
-func packNuspec(c *cli.Context) error {
+func packNupkg(c *cli.Context) error {
 
 	filename := c.Args().First()
 
@@ -342,110 +282,56 @@ func packNuspec(c *cli.Context) error {
 	return nil
 }
 
-// Rel represents a relationship used in RelFile
-type Rel struct {
-	Type   string `xml:"Type,attr"`
-	Target string `xml:"Target,attr"`
-	ID     string `xml:"Id,attr"`
-}
+func pushNupkg(c *cli.Context) error {
 
-// RelFile represents a Relationship File stored in .rels
-type RelFile struct {
-	XMLName xml.Name `xml:"Relationships"`
-	XMLns   string   `xml:"xmlns,attr"`
-	Rels    []*Rel   `xml:"Relationship"`
-}
-
-// Add appends a new relationship to the list
-func (rf *RelFile) Add(t string, targ string) {
-	r := &Rel{
-		Type:   t,
-		Target: targ,
-	}
-	rf.Rels = append(rf.Rels, r)
-	// Add UID (Unique in this file...)
-	rf.Rels[len(rf.Rels)-1].ID = fmt.Sprintf("R%015d", len(rf.Rels))
-}
-
-// NewRelFile returns a populated skeleton for a Nuget Packages Entry
-func NewRelFile() *RelFile {
-	// Create new entry
-	rf := &RelFile{
-		XMLns: "http://schemas.openxmlformats.org/package/2006/relationships",
-	}
-	return rf
-}
-
-// ToBytes exports structure as byte array
-func (rf *RelFile) ToBytes() ([]byte, error) {
-	var b bytes.Buffer
-	// Unmarshal into XML
-	output, err := xml.MarshalIndent(rf, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-	// Self-Close any empty XML elements (NuGet client is broken and requires this on some)
-	// This assumes Indented Marshalling above, non Indented will break XML
-	// Break XML Encoding to match Nuget server output
-	for bytes.Contains(output, []byte(`></`)) {
-		i := bytes.Index(output, []byte(`></`))
-		j := bytes.Index(output[i+1:], []byte(`>`))
-		output = append(output[:i], append([]byte(` /`), output[i+j+1:]...)...)
+	// Check .nuspec file has been supplied
+	filename := c.Args().First()
+	if filename == "" {
+		return errors.New("Error NU5002: Please specify a nuspec file to use")
 	}
 
-	// Write the XML Header
-	b.WriteString(xml.Header)
-	b.Write(output)
-	return b.Bytes(), nil
+	// Create MultiPart Writer
+	body := new(bytes.Buffer)
+	w := multipart.NewWriter(body)
+	// Create new File part
+	p, err := w.CreateFormFile("package", "package.nupkg")
+	checkError(err)
+	// Read in package contents
+	fileContents, err := ioutil.ReadFile(filename)
+	checkError(err)
+	// Write contents to part
+	_, err = p.Write(fileContents)
+	checkError(err)
+	// Close the writer
+	err = w.Close()
+	checkError(err)
 
-}
-
-// PsmdcpFile is a variation XML generated by nuget
-type PsmdcpFile struct {
-	XMLName        xml.Name `xml:"coreProperties"`
-	XMLNSdc        string   `xml:"xmlns:dc,attr"`
-	XMLNSdcterms   string   `xml:"xmlns:dcterms,attr"`
-	XMLNSxsi       string   `xml:"xmlns:xsi,attr"`
-	XMLNS          string   `xml:"xmlns,attr"`
-	Creator        string   `xml:"dc:creator"`
-	Description    string   `xml:"dc:description"`
-	Identifier     string   `xml:"dc:identifier"`
-	Version        string   `xml:"version"`
-	Keywords       string   `xml:"keywords"`
-	LastModifiedBy string   `xml:"lastModifiedBy"`
-}
-
-// NewPsmdcpFile returns a populated skeleton for a Nuget Packages Entry
-func NewPsmdcpFile() *PsmdcpFile {
-	// Create new entry
-	pf := &PsmdcpFile{
-		XMLNSdc:      "http://purl.org/dc/elements/1.1/",
-		XMLNSdcterms: "http://purl.org/dc/terms/",
-		XMLNSxsi:     "http://www.w3.org/2001/XMLSchema-instance",
-		XMLNS:        "http://schemas.openxmlformats.org/package/2006/metadata/core-properties",
+	// Create new PUT request
+	request, err := http.NewRequest(http.MethodPut, c.String("Source"), body)
+	checkError(err)
+	// Add the ApiKey if supplied
+	if c.String("ApiKey") != "" {
+		request.Header.Add("X-Nuget-Apikey", c.String("ApiKey"))
 	}
-	return pf
-}
+	// Add the Content Type header from the reader - includes boundary
+	request.Header.Add("Content-Type", w.FormDataContentType())
 
-// ToBytes exports structure as byte array
-func (pf *PsmdcpFile) ToBytes() ([]byte, error) {
-	var b bytes.Buffer
-	// Unmarshal into XML
-	output, err := xml.MarshalIndent(pf, "", "  ")
-	if err != nil {
-		return nil, err
-	}
-	// Self-Close any empty XML elements (NuGet client is broken and requires this on some)
-	// This assumes Indented Marshalling above, non Indented will break XML
-	// Break XML Encoding to match Nuget server output
-	for bytes.Contains(output, []byte(`></`)) {
-		i := bytes.Index(output, []byte(`></`))
-		j := bytes.Index(output[i+1:], []byte(`>`))
-		output = append(output[:i], append([]byte(` /`), output[i+j+1:]...)...)
+	// Push to the server
+	fmt.Println("Pushing " + filename + " to '" + c.String("Source") + "'...")
+	fmt.Println(" ", request.Method, request.URL.String())
+	startTime := time.Now()
+	client := &http.Client{}
+	resp, err := client.Do(request)
+	checkError(err)
+	duration := time.Now().Sub(startTime)
+
+	// Log out result
+	fmt.Println(" ", resp.StatusCode, resp.Request.URL.String(), duration.Milliseconds(), "ms")
+	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
+		fmt.Println("Your package was pushed.")
+	} else {
+		fmt.Println("Response status code does not indicate success:", resp.StatusCode)
 	}
 
-	// Write the XML Header
-	b.WriteString(xml.Header)
-	b.Write(output)
-	return b.Bytes(), nil
+	return nil
 }
