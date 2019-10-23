@@ -2,8 +2,28 @@
 project_name: go-nuget
 
 builds:
+  - id: binaries
+    goos:
+      - windows
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm
+      - arm64
+      - 386
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.compiled={{.Timestamp}} 
 
-  goos:
-    - windows
-    - darwin
-    - linux
+archives:
+  - builds:
+      - binaries
+    replacements:
+      darwin: Darwin
+      linux: Linux
+      windows: Windows
+      386: x86
+      amd64: x86_64
+    format_overrides:
+      - goos: windows
+        format: zip
