@@ -19,6 +19,9 @@ import (
 	"github.com/urfave/cli"
 )
 
+// Version Number -ldflags="-X 'main.Version=xX.Y.Z'"
+var Version string = "0.0.0-source"
+
 const letterBytes = "abcdef0123456789"
 
 func randomString(n int) string {
@@ -38,9 +41,9 @@ func checkError(e error) {
 
 func main() {
 	app := cli.NewApp()
+	app.Version = Version
 	app.Name = "go-nuget"
 	app.Usage = "An open source nuget clone in Go"
-	app.Compiled = time.Now()
 	app.Authors = []cli.Author{
 		cli.Author{
 			Name:  "Sam Shelton",
