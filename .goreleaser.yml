@@ -1,0 +1,9 @@
+# .goreleaser.yml
+project_name: go-nuget
+
+builds:
+
+  goos:
+    - windows
+    - darwin
+    - linux
