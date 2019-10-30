@@ -16,7 +16,10 @@ import (
 
 func archiveFile(filename string, w *zip.Writer, b []byte) {
 
-	// Create the .nuspec file to the root of the zip
+	// Check and convert filepath to `/` if required
+	filename = filepath.ToSlash(filename)
+
+	// Create the file in the zip
 	f, err := w.Create(filename)
 	checkError(err)
 
