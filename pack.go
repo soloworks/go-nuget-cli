@@ -140,11 +140,6 @@ func packNupkg(c *cli.Context) error {
 		}
 	}
 
-	// Add [Content_Types].xml to Archive
-	b, err = ct.ToBytes()
-	checkError(err)
-	archiveFile(`[Content_Types].xml`, w, b)
-
 	// Create and add .psmdcp file to Archive
 	pf := NewPsmdcpFile()
 	pf.Creator = n.Meta.Authors
@@ -155,7 +150,7 @@ func packNupkg(c *cli.Context) error {
 	pf.LastModifiedBy = "go-nuget"
 	b, err = pf.ToBytes()
 	checkError(err)
-	pfn := "/package/services/metadata/core-properties/" + randomString(32) + ".psmdcp"
+	pfn := "package/services/metadata/core-properties/" + randomString(32) + ".psmdcp"
 	archiveFile(pfn, w, b)
 	ct.Add(filepath.Ext(pfn))
 
@@ -168,6 +163,11 @@ func packNupkg(c *cli.Context) error {
 	checkError(err)
 	archiveFile(filepath.Join("_rels", ".rels"), w, b)
 	ct.Add(filepath.Ext(".rels"))
+
+	// Add [Content_Types].xml to Archive
+	b, err = ct.ToBytes()
+	checkError(err)
+	archiveFile(`[Content_Types].xml`, w, b)
 
 	// Close the zipwriter
 	w.Close()
