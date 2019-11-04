@@ -9,6 +9,9 @@ github.com/russross/blackfriday/v2 v2.0.1 h1:lPqVAte+HuHNfhJ/0LC98ESWRz8afy9tM/0
 github.com/russross/blackfriday/v2 v2.0.1/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/shurcooL/sanitized_anchor_name v1.0.0 h1:PdmoCO6wvbs+7yrJyMORt4/BmY5IYyJwS/kOiWx8mHo=
 github.com/shurcooL/sanitized_anchor_name v1.0.0/go.mod h1:1NzhyTcUVG4SuEtjjoZeVRXNmyL/1OwPU0+IJeTBvfc=
+github.com/soloworks/go-nuget v1.0.0 h1:KMFgIWPKtC12rUeh9QtqSt9Z1S/DVSh+nzWcx8Y5ZBE=
+github.com/soloworks/go-nuget v1.0.0/go.mod h1:IqUp1+6g/kBxoROxkBFtlT62JtAuaEM6u4bquZq5dd8=
+github.com/soloworks/go-nuspec v0.1.0/go.mod h1:mLMhXDLZHIjX/90kJfhlt51RgJrYzj7LdgxqLI3zxl0=
 github.com/soloworks/go-nuspec v0.3.0 h1:guoIL3K13UkjjriTqXV6Xfs1PVcLLib3X4E1fTlm26U=
 github.com/soloworks/go-nuspec v0.3.0/go.mod h1:mLMhXDLZHIjX/90kJfhlt51RgJrYzj7LdgxqLI3zxl0=
 github.com/urfave/cli v1.22.1 h1:+mkCCcOFKPnCmVYVcURKps1Xe+3zP90gSYGNfRkjoIY=

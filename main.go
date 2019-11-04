@@ -2,7 +2,6 @@ package main
 
 import (
 	"log"
-	"math/rand"
 	"os"
 	"strconv"
 	"time"
@@ -13,16 +12,6 @@ import (
 // Version Number -ldflags="-X 'main.Version=xX.Y.Z'"
 var version string = "0.0.0.0-master"
 var compiled string = "1262304000" // 01/01/2010 @ 12:00am
-
-const letterBytes = "abcdef0123456789"
-
-func randomString(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letterBytes[rand.Intn(len(letterBytes))]
-	}
-	return string(b)
-}
 
 func checkError(e error) {
 	if e != nil {
