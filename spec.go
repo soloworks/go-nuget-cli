@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/user"
 
-	nuget "github.com/soloworks/go-nuget"
+	nuget "github.com/soloworks/go-nuget-utils"
 	"github.com/urfave/cli"
 )
 

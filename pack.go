@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	nuget "github.com/soloworks/go-nuget"
+	nuget "github.com/soloworks/go-nuget-utils"
 	nuspec "github.com/soloworks/go-nuspec"
 	"github.com/urfave/cli"
 )

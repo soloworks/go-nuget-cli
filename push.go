@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	nuget "github.com/soloworks/go-nuget"
+	nuget "github.com/soloworks/go-nuget-utils"
 	"github.com/urfave/cli"
 )
 
