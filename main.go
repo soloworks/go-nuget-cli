@@ -86,7 +86,7 @@ func main() {
 					Usage: "Specifies the server URL.",
 				},
 			},
-			Action: pushNupkg,
+			Action: cliPushNupkg,
 		},
 		{
 			Name:  "spec",

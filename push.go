@@ -12,7 +12,7 @@ import (
 	"github.com/urfave/cli"
 )
 
-func pushNupkg(c *cli.Context) error {
+func cliPushNupkg(c *cli.Context) error {
 
 	// Check .nuspec file has been supplied
 	filename := c.Args().First()
@@ -20,14 +20,43 @@ func pushNupkg(c *cli.Context) error {
 		return errors.New("Error NU5002: Please specify a nuspec file to use")
 	}
 
+	// Read in package contents
+	fileContents, err := ioutil.ReadFile(filename)
+	checkError(err)
+
+	// print out for CLI
+	fmt.Println("Pushing " + filename + " to '" + c.String("Source") + "'...")
+	fmt.Println(" ", http.MethodPut, c.String("Source"))
+	status, dur, err := PushNupkg(fileContents, c.String("ApiKey"), c.String("Source"))
+	checkError(err)
+
+	// print out for CLI
+	fmt.Println(" ", status, c.String("Source"), dur, "ms")
+
+	// Log out result
+	if status >= 200 && status <= 299 {
+		fmt.Println("Your package was pushed.")
+	} else {
+		fmt.Println("Response status code does not indicate success:", status)
+	}
+
+	// Return Ok
+	return nil
+}
+
+// PushNupkg PUTs a .nupkg binary to a NuGet Repository
+func PushNupkg(fileContents []byte, apiKey string, host string) (int, int64, error) {
+
+	// If no Source provided, exit
+	if host == "" {
+		return 0, 0, errors.New("Error: Please specify a Source/Host")
+	}
+
 	// Create MultiPart Writer
 	body := new(bytes.Buffer)
 	w := multipart.NewWriter(body)
 	// Create new File part
 	p, err := w.CreateFormFile("package", "package.nupkg")
-	checkError(err)
-	// Read in package contents
-	fileContents, err := ioutil.ReadFile(filename)
 	checkError(err)
 	// Write contents to part
 	_, err = p.Write(fileContents)
@@ -37,31 +66,22 @@ func pushNupkg(c *cli.Context) error {
 	checkError(err)
 
 	// Create new PUT request
-	request, err := http.NewRequest(http.MethodPut, c.String("Source"), body)
+	request, err := http.NewRequest(http.MethodPut, host, body)
 	checkError(err)
 	// Add the ApiKey if supplied
-	if c.String("ApiKey") != "" {
-		request.Header.Add("X-Nuget-Apikey", c.String("ApiKey"))
+	if apiKey != "" {
+		request.Header.Add("X-Nuget-Apikey", apiKey)
 	}
 	// Add the Content Type header from the reader - includes boundary
 	request.Header.Add("Content-Type", w.FormDataContentType())
 
 	// Push to the server
-	fmt.Println("Pushing " + filename + " to '" + c.String("Source") + "'...")
-	fmt.Println(" ", request.Method, request.URL.String())
 	startTime := time.Now()
 	client := &http.Client{}
 	resp, err := client.Do(request)
 	checkError(err)
 	duration := time.Now().Sub(startTime)
 
-	// Log out result
-	fmt.Println(" ", resp.StatusCode, resp.Request.URL.String(), duration.Milliseconds(), "ms")
-	if resp.StatusCode >= 200 && resp.StatusCode <= 299 {
-		fmt.Println("Your package was pushed.")
-	} else {
-		fmt.Println("Response status code does not indicate success:", resp.StatusCode)
-	}
-
-	return nil
+	// Return Results
+	return resp.StatusCode, duration.Milliseconds(), nil
 }
