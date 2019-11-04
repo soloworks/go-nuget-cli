@@ -62,6 +62,7 @@ func cliPackNupkg(c *cli.Context) error {
 	}
 
 	b, err := PackNupkg(ns, basePath, outputPath)
+	checkError(err)
 
 	// Override Version if option is set
 	if v := c.String("Version"); v != "" {
@@ -91,7 +92,7 @@ func cliPackNupkg(c *cli.Context) error {
 func PackNupkg(ns *nuspec.NuSpec, basePath string, outputPath string) ([]byte, error) {
 
 	// Assume filename from ID
-	nsfilename := ns.Meta.ID + ".nupkg"
+	nsfilename := ns.Meta.ID + ".nuspec"
 
 	// Create a buffer to write our archive to.
 	buf := new(bytes.Buffer)
