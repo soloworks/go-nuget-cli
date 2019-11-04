@@ -28,9 +28,9 @@ func archiveFile(fn string, w *zip.Writer, b []byte) {
 	checkError(err)
 }
 
-// Package up a NuSpec file
-func packNupkg(c *cli.Context) error {
+func cliPackNupkg(c *cli.Context) error {
 
+	// Get filename from command line
 	nsfilename := c.Args().First()
 
 	// Check .nuspec file has been supplied
@@ -40,34 +40,58 @@ func packNupkg(c *cli.Context) error {
 	// Log out
 	fmt.Println("Attempting to build package from '" + nsfilename + "'.")
 	// Read in the nuspec file
-	n, err := nuspec.FromFile(nsfilename)
+	ns, err := nuspec.FromFile(nsfilename)
 	checkError(err)
-
-	// Override Version if option is set
-	if v := c.String("Version"); v != "" {
-		n.Meta.Version = v
-	}
 
 	// Set BasePath based on file provided
 	basePath := filepath.Dir(nsfilename)
-
-	// Override basePath if option is set
+	// Override basePath if argument is provided
 	if bp := c.String("BasePath"); bp != "" {
 		basePath = bp
 		// Check BasePath exists
 		if _, err := os.Stat(bp); os.IsNotExist(err) {
 			log.Fatalln("Error: BasePath not found")
 		}
-
 	}
 
 	// Set OutputDirectory based on file provided
 	outputPath := ""
-
 	// Override OutputDirectory if option is set
 	if op := c.String("OutputDirectory"); op != "" {
 		outputPath = op
 	}
+
+	b, err := PackNupkg(ns, basePath, outputPath)
+
+	// Override Version if option is set
+	if v := c.String("Version"); v != "" {
+		ns.Meta.Version = v
+	}
+
+	// Ensure directory is present
+	if outputPath != "" {
+		os.MkdirAll(outputPath, os.ModePerm)
+	}
+	// Create new file on disk
+	outputFile := ns.Meta.ID + "." + ns.Meta.Version + ".nupkg"
+	outputFile = filepath.Join(outputPath, outputFile)
+	err = ioutil.WriteFile(outputFile, b, os.ModePerm)
+	checkError(err)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	println("Successfully created package '" + outputFile + "'")
+
+	return nil
+}
+
+// PackNupkg produces a .nupkg file in byte format
+func PackNupkg(ns *nuspec.NuSpec, basePath string, outputPath string) ([]byte, error) {
+
+	// Assume filename from ID
+	nsfilename := ns.Meta.ID + ".nupkg"
 
 	// Create a buffer to write our archive to.
 	buf := new(bytes.Buffer)
@@ -80,14 +104,14 @@ func packNupkg(c *cli.Context) error {
 	ct := NewContentTypes()
 
 	// Add .nuspec to Archive
-	b, err := n.ToBytes()
+	b, err := ns.ToBytes()
 	checkError(err)
 	archiveFile(filepath.Base(nsfilename), w, b)
 	ct.Add(filepath.Ext(nsfilename))
 
 	// Process files
 	// If there are no file globs specified then
-	if len(n.Files.File) == 0 {
+	if len(ns.Files.File) == 0 {
 		// walk the basePath and zip up all found files. Everything.]
 		err = filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
 			if !info.IsDir() && filepath.Base(path) != filepath.Base(nsfilename) {
@@ -110,7 +134,7 @@ func packNupkg(c *cli.Context) error {
 		checkError(err)
 	} else {
 		// For each of the specified globs, get files an put in target
-		for _, f := range n.Files.File {
+		for _, f := range ns.Files.File {
 			// Apply glob, cater for
 			matches, err := filepath.Glob(filepath.ToSlash(filepath.Join(basePath, f.Source)))
 			checkError(err)
@@ -142,11 +166,11 @@ func packNupkg(c *cli.Context) error {
 
 	// Create and add .psmdcp file to Archive
 	pf := NewPsmdcpFile()
-	pf.Creator = n.Meta.Authors
-	pf.Description = n.Meta.Description
-	pf.Identifier = n.Meta.ID
-	pf.Version = n.Meta.Version
-	pf.Keywords = n.Meta.Tags
+	pf.Creator = ns.Meta.Authors
+	pf.Description = ns.Meta.Description
+	pf.Identifier = ns.Meta.ID
+	pf.Version = ns.Meta.Version
+	pf.Keywords = ns.Meta.Tags
 	pf.LastModifiedBy = "go-nuget"
 	b, err = pf.ToBytes()
 	checkError(err)
@@ -172,20 +196,6 @@ func packNupkg(c *cli.Context) error {
 	// Close the zipwriter
 	w.Close()
 
-	// Ensure directory is present
-	if outputPath != "" {
-		os.MkdirAll(outputPath, os.ModePerm)
-	}
-	// Create new file on disk
-	outputFile := n.Meta.ID + "." + n.Meta.Version + ".nupkg"
-	outputFile = filepath.Join(outputPath, outputFile)
-	err = ioutil.WriteFile(outputFile, buf.Bytes(), os.ModePerm)
-	checkError(err)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	println("Successfully created package '" + outputFile + "'")
-	return nil
+	// Return
+	return buf.Bytes(), nil
 }

@@ -71,7 +71,7 @@ func main() {
 					Usage: "Overrides the version number from the nuspec file.",
 				},
 			},
-			Action: packNupkg,
+			Action: cliPackNupkg,
 		},
 		{
 			Name:  "push",
