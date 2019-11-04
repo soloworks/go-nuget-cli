@@ -97,7 +97,7 @@ func main() {
 					Usage: "Overwrite nuspec file if it exists",
 				},
 			},
-			Action: sampleNuspec,
+			Action: cliSampleNuSpec,
 		},
 	}
 
